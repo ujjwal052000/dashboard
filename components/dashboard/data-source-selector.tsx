@@ -22,23 +22,22 @@ export function DataSourceSelector({ selectedSources, onSourcesChange }: DataSou
   }
 
   return (
-    <Card className="mb-8 border-0 bg-gradient-to-r from-card to-secondary/5 p-6 shadow-lg shadow-accent/5">
-      <h2 className="mb-6 text-lg font-semibold text-foreground flex items-center gap-2">
-        <span className="text-xl">📑</span>
+    <Card className="mb-8 border border-border bg-card p-6 shadow-sm">
+      <h2 className="mb-6 text-base font-semibold text-foreground">
         Data Sources
       </h2>
       <div className="space-y-3">
         {dataSources.map((source) => (
           <div
             key={source.id}
-            className="flex items-start gap-4 p-4 rounded-lg bg-secondary/40 hover:bg-secondary/60 transition-colors"
+            className="flex items-start gap-4 p-4 rounded-lg border border-border bg-background hover:bg-muted/50 transition-colors"
           >
             <input
               type="checkbox"
               id={source.id}
               checked={selectedSources.includes(source.id)}
               onChange={() => handleToggle(source.id)}
-              className="mt-1 cursor-pointer w-5 h-5 accent-primary"
+              className="mt-1 cursor-pointer w-5 h-5"
             />
             <div className="flex-1">
               <label htmlFor={source.id} className="cursor-pointer font-medium text-foreground">
@@ -48,7 +47,7 @@ export function DataSourceSelector({ selectedSources, onSourcesChange }: DataSou
                 {source.sheets.map((sheet) => (
                   <span
                     key={sheet}
-                    className="inline-block rounded-full bg-gradient-to-r from-primary/20 to-accent/20 px-3 py-1 text-xs font-medium text-primary border border-primary/30"
+                    className="inline-block rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground border border-border"
                   >
                     {sheet}
                   </span>

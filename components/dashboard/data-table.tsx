@@ -2,43 +2,49 @@
 
 import { useState, useMemo } from "react"
 import { Card } from "@/components/ui/card"
-import type { MultiSheetResponse, SheetRow } from "@/lib/google-sheets-integration"
+import type { SheetRow } from "@/lib/google-sheets-integration"
 
 interface DataTableProps {
-  sheetData: MultiSheetResponse
+  filteredData: SheetRow[]
 }
 
-export function DataTable({ sheetData }: DataTableProps) {
+export function DataTable({ filteredData }: DataTableProps) {
   const [sortBy, setSortBy] = useState<string>("")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [selectedSheet, setSelectedSheet] = useState<string>("all")
 
-  // Get all unique headers across all sheets
+  // Get all unique headers from filtered data
   const allHeaders = useMemo(() => {
     const headerSet = new Set<string>()
-    sheetData.data.forEach(sheet => {
-      sheet.headers.forEach(header => {
+    filteredData.forEach(row => {
+      Object.keys(row).forEach(header => {
         if (!header.startsWith('_')) {
           headerSet.add(header)
         }
       })
     })
     return Array.from(headerSet)
-  }, [sheetData])
+  }, [filteredData])
+
+  // Get unique sheet names from filtered data
+  const sheetNames = useMemo(() => {
+    const sheetSet = new Set<string>()
+    filteredData.forEach(row => {
+      if (row._sheetName) {
+        sheetSet.add(row._sheetName)
+      }
+    })
+    return Array.from(sheetSet)
+  }, [filteredData])
 
   // Get data to display
   const displayData = useMemo(() => {
-    let data: SheetRow[] = []
-    
     if (selectedSheet === "all") {
-      data = sheetData.data.flatMap(sheet => sheet.data)
+      return filteredData
     } else {
-      const sheet = sheetData.data.find(s => s.sheetName === selectedSheet)
-      data = sheet?.data || []
+      return filteredData.filter(row => row._sheetName === selectedSheet)
     }
-    
-    return data
-  }, [sheetData, selectedSheet])
+  }, [filteredData, selectedSheet])
 
   // Sort data
   const sortedData = useMemo(() => {
@@ -73,19 +79,13 @@ export function DataTable({ sheetData }: DataTableProps) {
 
   // Get headers for the selected sheet(s)
   const tableHeaders = useMemo(() => {
-    if (selectedSheet === "all") {
-      return allHeaders
-    } else {
-      const sheet = sheetData.data.find(s => s.sheetName === selectedSheet)
-      return sheet?.headers.filter(h => !h.startsWith('_')) || []
-    }
-  }, [selectedSheet, sheetData, allHeaders])
+    return allHeaders
+  }, [allHeaders])
 
   return (
-    <Card className="border-0 bg-gradient-to-br from-card to-secondary/5 p-6 shadow-lg shadow-primary/5">
+    <Card className="border border-border bg-card p-6 shadow-sm">
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <span className="text-2xl">📋</span>
+        <h2 className="text-xl font-semibold text-foreground">
           Raw Data
         </h2>
         <div className="flex items-center gap-2">
@@ -96,9 +96,9 @@ export function DataTable({ sheetData }: DataTableProps) {
             className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="all">All Sheets</option>
-            {sheetData.data.map(sheet => (
-              <option key={sheet.sheetName} value={sheet.sheetName}>
-                {sheet.sourceId} - {sheet.sheetName}
+            {sheetNames.map(sheetName => (
+              <option key={sheetName} value={sheetName}>
+                {sheetName}
               </option>
             ))}
           </select>
@@ -107,16 +107,16 @@ export function DataTable({ sheetData }: DataTableProps) {
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-primary/20 bg-gradient-to-r from-primary/10 to-accent/10">
+            <tr className="border-b border-border bg-muted/50">
               {tableHeaders.map((header) => (
                 <th
                   key={header}
                   onClick={() => handleSort(header)}
-                  className="cursor-pointer px-4 py-4 text-left text-sm font-semibold text-foreground hover:bg-primary/20 transition-colors whitespace-nowrap"
+                  className="cursor-pointer px-4 py-4 text-left text-sm font-semibold text-foreground hover:bg-muted transition-colors whitespace-nowrap"
                 >
                   {header}
                   {sortBy === header && (
-                    <span className="ml-2 text-primary">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                    <span className="ml-2 text-muted-foreground">{sortOrder === "asc" ? "↑" : "↓"}</span>
                   )}
                 </th>
               ))}
@@ -141,7 +141,7 @@ export function DataTable({ sheetData }: DataTableProps) {
                         className={`px-4 py-3 text-sm ${isNumeric ? 'font-semibold text-foreground' : 'text-foreground'}`}
                       >
                         {isNumeric ? (
-                          <span className="bg-gradient-to-r from-primary/20 to-accent/10 bg-clip-text text-foreground">
+                          <span className="text-foreground">
                             {Number(value).toLocaleString()}
                           </span>
                         ) : (

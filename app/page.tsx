@@ -1,22 +1,24 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { DashboardHeader } from "@/components/dashboard/header"
-import { DataSourceSelector } from "@/components/dashboard/data-source-selector"
 import { FilterPanel } from "@/components/dashboard/filter-panel"
 import { ChartsGrid } from "@/components/dashboard/charts-grid"
 import { DataTable } from "@/components/dashboard/data-table"
+import { KPICards } from "@/components/dashboard/kpi-cards"
 import { fetchMultipleSheets, type SheetRow, type MultiSheetResponse } from "@/lib/google-sheets-integration"
 import { RefreshCw, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 
 export default function Dashboard() {
-  const [selectedSources, setSelectedSources] = useState<string[]>(["test-sheet-1"])
+  // Always load data from both sheets
+  const selectedSources = ["test-sheet-1", "test-sheet-2"]
   const [filters, setFilters] = useState({
     dateRange: "all",
-    category: "all",
-    region: "all",
+    aliases: "all",
+    customStartDate: "",
+    customEndDate: "",
   })
   const [sheetData, setSheetData] = useState<MultiSheetResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,13 +27,7 @@ export default function Dashboard() {
   const [autoRefresh, setAutoRefresh] = useState(true)
 
   // Fetch data from Google Sheets
-  const fetchData = async () => {
-    if (selectedSources.length === 0) {
-      setSheetData(null)
-      setLoading(false)
-      return
-    }
-
+  const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -39,28 +35,34 @@ export default function Dashboard() {
       setSheetData(response)
       setLastUpdated(new Date())
     } catch (err: any) {
-      setError(err.message || "Failed to fetch data from Google Sheets")
-      console.error("Error fetching data:", err)
+      const errorMessage = err.message || "Failed to fetch data from Google Sheets"
+      setError(errorMessage)
+      // Only log errors, not on every render
+      if (err.message && !err.message.includes('Failed to fetch')) {
+        console.error("Error fetching data:", err.message)
+      }
     } finally {
       setLoading(false)
     }
-  }
-
-  // Initial fetch and when sources change
-  useEffect(() => {
-    fetchData()
   }, [selectedSources])
 
-  // Auto-refresh every 30 seconds
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run once on mount
+
+  // Auto-refresh every 60 seconds (reduced frequency to avoid quota issues)
   useEffect(() => {
     if (!autoRefresh) return
 
     const interval = setInterval(() => {
       fetchData()
-    }, 30000) // 30 seconds
+    }, 60000) // 60 seconds - increased to reduce API calls
 
     return () => clearInterval(interval)
-  }, [autoRefresh, selectedSources])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh]) // Only depend on autoRefresh, fetchData is stable
 
   // Flatten all sheet data into a single array
   const allData = useMemo(() => {
@@ -68,57 +70,91 @@ export default function Dashboard() {
     return sheetData.data.flatMap(sheet => sheet.data)
   }, [sheetData])
 
-  // Get unique values for filters from actual data
-  const categories = useMemo(() => {
-    const categorySet = new Set<string>()
+  // Get unique aliases from actual data
+  const aliases = useMemo(() => {
+    const aliasSet = new Set<string>()
     allData.forEach((row: SheetRow) => {
-      // Try to find category-like columns
-      Object.keys(row).forEach(key => {
-        if (key.toLowerCase().includes('category') || key.toLowerCase().includes('type') || key.toLowerCase().includes('edm')) {
-          if (row[key]) categorySet.add(String(row[key]))
-        }
-      })
+      // Look for Aliaes column (note the typo in the sheet)
+      const alias = row['Aliaes'] || row['Alias'] || row['Aliases'] || ''
+      if (alias && String(alias).trim() !== '') {
+        aliasSet.add(String(alias).trim())
+      }
     })
-    return Array.from(categorySet)
+    return Array.from(aliasSet).sort()
   }, [allData])
 
-  const regions = useMemo(() => {
-    const regionSet = new Set<string>()
-    allData.forEach((row: SheetRow) => {
-      Object.keys(row).forEach(key => {
-        if (key.toLowerCase().includes('region') || key.toLowerCase().includes('location')) {
-          if (row[key]) regionSet.add(String(row[key]))
-        }
-      })
-    })
-    return Array.from(regionSet)
-  }, [allData])
-
-  // Apply filters (simplified for now since we don't know exact column structure)
+  // Apply filters
   const filteredData = useMemo(() => {
-    return allData.filter((item: SheetRow) => {
-      if (filters.category !== "all") {
-        const hasCategory = Object.values(item).some(val => String(val) === filters.category)
-        if (!hasCategory) return false
+    let filtered = allData
+
+    // Apply aliases filter
+    if (filters.aliases !== "all") {
+      filtered = filtered.filter((item: SheetRow) => {
+        const alias = item['Aliaes'] || item['Alias'] || item['Aliases'] || ''
+        return String(alias).trim() === filters.aliases
+      })
+    }
+
+    // Apply date range filter
+    if (filters.dateRange === "all") {
+      // Show all data - no date filtering
+      // filtered remains as is
+    } else if (filters.dateRange === "custom") {
+      // Custom date range
+      if (filters.customStartDate || filters.customEndDate) {
+        const startDate = filters.customStartDate ? new Date(filters.customStartDate) : new Date(0)
+        const endDate = filters.customEndDate ? new Date(filters.customEndDate) : new Date()
+
+        filtered = filtered.filter((item: SheetRow) => {
+          const dateStr = item['From Date'] || item['To Date'] || item['Date'] || ''
+          if (!dateStr) return true
+
+          try {
+            const itemDate = new Date(dateStr)
+            if (isNaN(itemDate.getTime())) return true
+            return itemDate >= startDate && itemDate <= endDate
+          } catch {
+            return true
+          }
+        })
       }
-      if (filters.region !== "all") {
-        const hasRegion = Object.values(item).some(val => String(val) === filters.region)
-        if (!hasRegion) return false
+    } else {
+      // Predefined ranges (7d, 30d)
+      const now = new Date()
+      let cutoffDate: Date
+
+      if (filters.dateRange === "7d") {
+        cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      } else if (filters.dateRange === "30d") {
+        cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      } else {
+        cutoffDate = new Date(0) // Fallback - all time
       }
-      return true
-    })
+
+      filtered = filtered.filter((item: SheetRow) => {
+        const dateStr = item['From Date'] || item['To Date'] || item['Date'] || ''
+        if (!dateStr) return true
+
+        try {
+          const itemDate = new Date(dateStr)
+          if (isNaN(itemDate.getTime())) return true
+          return itemDate >= cutoffDate
+        } catch {
+          return true
+        }
+      })
+    }
+
+    return filtered
   }, [filters, allData])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       {/* Header */}
       <DashboardHeader />
 
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Data Source Selector */}
-        <DataSourceSelector selectedSources={selectedSources} onSourcesChange={setSelectedSources} />
-
         {/* Status and Controls */}
         <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -163,21 +199,22 @@ export default function Dashboard() {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              No data available. Please select at least one data source or check your Google Sheets API configuration.
+              No data available. Please check your Google Sheets API configuration and ensure the sheets are shared with the service account.
             </AlertDescription>
           </Alert>
         ) : (
           <>
-            {/* Filters */}
-            {(categories.length > 0 || regions.length > 0) && (
-              <FilterPanel filters={filters} onFiltersChange={setFilters} categories={categories} regions={regions} />
-            )}
+            {/* KPI Cards */}
+            {filteredData.length > 0 && <KPICards data={filteredData} />}
 
-            {/* Charts - Only show if we have numeric data */}
-            {sheetData && <ChartsGrid sheetData={sheetData} />}
+            {/* Filters */}
+            <FilterPanel filters={filters} onFiltersChange={setFilters} aliases={aliases} />
+
+            {/* Charts - Pass filtered data */}
+            {sheetData && <ChartsGrid filteredData={filteredData} />}
 
             {/* Data Table */}
-            {sheetData && <DataTable sheetData={sheetData} />}
+            {sheetData && <DataTable filteredData={filteredData} />}
           </>
         )}
       </main>

@@ -35,18 +35,30 @@ export async function fetchMultipleSheets(sourceIds: string[]): Promise<MultiShe
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ sourceIds }),
-      cache: 'no-store' // Always fetch fresh data
+      next: { revalidate: 60 } // Cache for 60 seconds to reduce API calls
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || `HTTP error! status: ${response.status}`)
+      let errorMessage = `HTTP error! status: ${response.status}`
+      try {
+        const error = await response.json()
+        errorMessage = error.error || errorMessage
+      } catch (e) {
+        // If response is not JSON, get text
+        const text = await response.text()
+        errorMessage = text || errorMessage
+      }
+      throw new Error(errorMessage)
     }
 
     return await response.json()
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching multiple sheets:', error)
-    throw error
+    // Provide more helpful error messages
+    if (error.message === 'Failed to fetch') {
+      throw new Error('Unable to connect to the server. Please check if the development server is running and the API route is accessible.')
+    }
+    throw new Error(error.message || 'Failed to fetch data from Google Sheets')
   }
 }
 

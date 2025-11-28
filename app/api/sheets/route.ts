@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 
+// Rate limiting: track last request time per sheet
+const requestCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_DURATION = 60000 // 60 seconds cache
+
 // Google Sheets configuration
 const SHEET_CONFIGS = {
   'test-sheet-1': {
@@ -71,8 +75,20 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get Google Sheets client
-    const sheets = getSheetsClient()
+    // Get Google Sheets client - this will throw if credentials are missing
+    let sheets
+    try {
+      sheets = getSheetsClient()
+    } catch (authError: any) {
+      console.error('Authentication error:', authError)
+      return NextResponse.json(
+        { 
+          error: authError.message || 'Failed to authenticate with Google Sheets API',
+          hint: 'Please check your GOOGLE_SERVICE_ACCOUNT environment variable in .env.local'
+        },
+        { status: 500 }
+      )
+    }
 
     // Fetch data from Google Sheets
     const range = `${sheetName}!A:Z` // Get all columns
@@ -105,9 +121,28 @@ export async function GET(request: NextRequest) {
       lastUpdated: new Date().toISOString()
     })
   } catch (error: any) {
-    console.error('Error fetching sheet data:', error)
+    // Only log actual errors
+    if (error.message && !error.message.includes('Failed to fetch')) {
+      console.error('Error fetching sheet data:', error.message)
+    }
+    
+    // Provide more detailed error messages
+    let errorMessage = error.message || 'Internal server error'
+    
+    if (error.message?.includes('GOOGLE_SERVICE_ACCOUNT')) {
+      errorMessage = 'Service account credentials not configured. Please check your .env.local file.'
+    } else if (error.message?.includes('Invalid')) {
+      errorMessage = 'Invalid service account JSON format. Please check your .env.local file.'
+    } else if (error.message?.includes('Permission denied') || error.message?.includes('403')) {
+      errorMessage = 'Permission denied. Please ensure the Google Sheets are shared with the service account email: dashboard-sheet@dashboard-479519.iam.gserviceaccount.com'
+    } else if (error.message?.includes('not found') || error.message?.includes('404')) {
+      errorMessage = 'Sheet not found. Please check the sheet names and IDs in the configuration.'
+    }
+    
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { 
+        error: errorMessage
+      },
       { status: 500 }
     )
   }
@@ -126,10 +161,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get Google Sheets client
-    const sheets = getSheetsClient()
+    // Get Google Sheets client - this will throw if credentials are missing
+    let sheets
+    try {
+      sheets = getSheetsClient()
+    } catch (authError: any) {
+      console.error('Authentication error:', authError)
+      return NextResponse.json(
+        { 
+          error: authError.message || 'Failed to authenticate with Google Sheets API',
+          hint: 'Please check your GOOGLE_SERVICE_ACCOUNT environment variable in .env.local'
+        },
+        { status: 500 }
+      )
+    }
 
     const allData: any[] = []
+    const quotaErrorLogged = new Set<string>() // Track logged quota errors to avoid spam
 
     for (const sourceId of sourceIds) {
       const config = SHEET_CONFIGS[sourceId as keyof typeof SHEET_CONFIGS]
@@ -137,6 +185,22 @@ export async function POST(request: NextRequest) {
 
       for (const sheet of config.sheets) {
         try {
+          // Check cache first
+          const cacheKey = `${sourceId}-${sheet.name}`
+          const cached = requestCache.get(cacheKey)
+          const now = Date.now()
+          
+          if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+            // Use cached data
+            allData.push(cached.data)
+            continue
+          }
+
+          // Add delay between requests to avoid hitting rate limits
+          if (allData.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, 300)) // 300ms delay between requests
+          }
+
           const range = `${sheet.name}!A:Z`
           const response = await sheets.spreadsheets.values.get({
             spreadsheetId: config.spreadsheetId,
@@ -160,14 +224,37 @@ export async function POST(request: NextRequest) {
             return rowData
           })
 
-          allData.push({
+          const sheetData = {
             sourceId,
             sheetName: sheet.name,
             headers,
             data
-          })
-        } catch (error) {
-          console.error(`Error fetching ${sourceId}/${sheet.name}:`, error)
+          }
+          
+          // Cache the data
+          requestCache.set(cacheKey, { data: sheetData, timestamp: now })
+          
+          allData.push(sheetData)
+        } catch (error: any) {
+          // Handle quota errors silently (only log once per sheet)
+          if (error.message?.includes('Quota exceeded')) {
+            const errorKey = `${sourceId}/${sheet.name}`
+            if (!quotaErrorLogged.has(errorKey)) {
+              quotaErrorLogged.add(errorKey)
+              console.warn(`Quota exceeded for ${errorKey}. Requests will be cached.`)
+            }
+            // Continue to next sheet instead of breaking
+            continue
+          }
+          
+          // Only log other errors that are not expected
+          if (error.code === 403) {
+            console.error(`Permission denied for sheet ${sheet.name}. Make sure it's shared with: dashboard-sheet@dashboard-479519.iam.gserviceaccount.com`)
+          } else if (error.code === 404) {
+            console.error(`Sheet ${sheet.name} not found in spreadsheet ${config.spreadsheetId}`)
+          } else if (error.code && error.code !== 'ENOTFOUND' && !error.message?.includes('Quota exceeded')) {
+            console.error(`Error fetching ${sourceId}/${sheet.name}:`, error.message || error)
+          }
         }
       }
     }
@@ -175,11 +262,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       data: allData,
       lastUpdated: new Date().toISOString()
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120'
+      }
     })
   } catch (error: any) {
-    console.error('Error fetching multiple sheets:', error)
+    // Only log actual errors, not expected issues
+    if (error.message && !error.message.includes('Failed to fetch')) {
+      console.error('Error fetching multiple sheets:', error.message)
+    }
+    
+    // Provide more detailed error messages
+    let errorMessage = error.message || 'Internal server error'
+    
+    if (error.message?.includes('GOOGLE_SERVICE_ACCOUNT')) {
+      errorMessage = 'Service account credentials not configured. Please check your .env.local file.'
+    } else if (error.message?.includes('Invalid')) {
+      errorMessage = 'Invalid service account JSON format. Please check your .env.local file.'
+    } else if (error.message?.includes('Permission denied') || error.message?.includes('403')) {
+      errorMessage = 'Permission denied. Please ensure the Google Sheets are shared with the service account email: dashboard-sheet@dashboard-479519.iam.gserviceaccount.com'
+    } else if (error.message?.includes('not found') || error.message?.includes('404')) {
+      errorMessage = 'Sheet not found. Please check the sheet names and IDs in the configuration.'
+    }
+    
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { 
+        error: errorMessage
+      },
       { status: 500 }
     )
   }
