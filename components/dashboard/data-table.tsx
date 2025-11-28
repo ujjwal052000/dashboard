@@ -15,6 +15,14 @@ const PREFERRED_COLUMN_GROUPS: string[][] = [
   ['Leads', 'Lead', 'leads', 'LEAD'],
 ]
 
+const getCellAlignment = (header: string, isNumeric: boolean) => {
+  if (/date/i.test(header) || /alia/i.test(header) || /edm|campaign|channel|type|activity/i.test(header)) {
+    return 'text-left'
+  }
+  if (isNumeric) return 'text-right'
+  return 'text-center'
+}
+
 interface DataTableProps {
   filteredData: SheetRow[]
 }
@@ -110,18 +118,18 @@ export function DataTable({ filteredData }: DataTableProps) {
   }, [allHeaders])
 
   return (
-    <Card className="border-0 bg-white dark:bg-gray-900 p-6 shadow-xl ring-1 ring-black/5 dark:ring-white/10">
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <Card className="border-0 bg-white dark:bg-gray-900 p-5 shadow-xl ring-1 ring-black/5 dark:ring-white/10">
+      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Raw data snapshot</p>
-          <h2 className="text-2xl font-semibold text-foreground">Key funnel columns</h2>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Raw data snapshot</p>
+          <h2 className="text-xl font-semibold text-foreground">Key funnel columns</h2>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-muted-foreground">Sheet:</label>
           <select
             value={selectedSheet}
             onChange={(e) => setSelectedSheet(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="all">All Sheets</option>
             {sheetNames.map(sheetName => (
@@ -137,15 +145,15 @@ export function DataTable({ filteredData }: DataTableProps) {
           No funnel-specific columns detected. Make sure your sheets include Date, Sent, and Leads information.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border/40">
-          <table className="w-full border-collapse text-sm">
+        <div className="overflow-x-auto overflow-y-auto rounded-2xl border border-border/40 shadow-inner max-h-[360px]">
+          <table className="w-full min-w-[580px] table-fixed text-xs sm:text-sm">
             <thead>
-              <tr className="bg-muted/40">
+              <tr className="bg-muted/40 text-[11px] sm:text-xs">
                 {tableHeaders.map((header) => (
                   <th
                     key={header}
                     onClick={() => handleSort(header)}
-                    className="cursor-pointer px-4 py-4 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap"
+                    className="cursor-pointer px-3 py-3 text-left font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap"
                   >
                     {header}
                     {sortBy === header && (
@@ -166,16 +174,16 @@ export function DataTable({ filteredData }: DataTableProps) {
                 sortedData.map((row, idx) => (
                   <tr
                     key={row._id || idx}
-                    className="border-b border-border/30 bg-white dark:bg-gray-900/20 even:bg-muted/20 hover:bg-primary/5 transition-colors"
+                    className="border-b border-border/20 bg-white/80 dark:bg-gray-900/40 even:bg-muted/30 hover:bg-primary/5 transition-colors text-[12px] sm:text-xs"
                   >
                     {tableHeaders.map((header, colIdx) => {
                       const value = row[header] || ''
                       const isNumeric = !isNaN(Number(value)) && value !== ''
-                      const alignment = isNumeric ? 'text-right' : 'text-left'
+                      const alignment = getCellAlignment(header, isNumeric)
                       return (
                         <td
                           key={`${header}-${colIdx}`}
-                          className={`px-4 py-3 text-sm text-foreground ${alignment}`}
+                          className={`px-3 py-2 text-foreground whitespace-nowrap ${alignment}`}
                         >
                           {isNumeric ? Number(value).toLocaleString() : String(value)}
                         </td>
@@ -188,7 +196,7 @@ export function DataTable({ filteredData }: DataTableProps) {
           </table>
         </div>
       )}
-      <p className="mt-4 text-xs text-muted-foreground">
+      <p className="mt-4 text-[11px] text-muted-foreground">
         Showing {sortedData.length} record{sortedData.length !== 1 ? 's' : ''} from {selectedSheet === "all" ? "all sheets" : selectedSheet}
       </p>
     </Card>
