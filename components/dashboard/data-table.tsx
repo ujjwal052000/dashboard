@@ -15,11 +15,23 @@ const PREFERRED_COLUMN_GROUPS: string[][] = [
   ['Leads', 'Lead', 'leads', 'LEAD'],
 ]
 
+const NUMERIC_HEADER_REGEX = /(sent|open|click|unsubscribe|leads)/i
+
 const getCellAlignment = (header: string, isNumeric: boolean) => {
   if (/date/i.test(header) || /alia/i.test(header) || /edm|campaign|channel|type|activity/i.test(header)) {
     return 'text-left'
   }
   if (isNumeric) return 'text-right'
+  return 'text-center'
+}
+
+const getHeaderAlignment = (header: string) => {
+  if (/date/i.test(header) || /alia/i.test(header) || /edm|campaign|channel|type|activity/i.test(header)) {
+    return 'text-left'
+  }
+  if (NUMERIC_HEADER_REGEX.test(header)) {
+    return 'text-right'
+  }
   return 'text-center'
 }
 
@@ -149,18 +161,21 @@ export function DataTable({ filteredData }: DataTableProps) {
           <table className="w-full min-w-[580px] table-fixed text-xs sm:text-sm">
             <thead>
               <tr className="bg-muted/40 text-[11px] sm:text-xs">
-                {tableHeaders.map((header) => (
-                  <th
-                    key={header}
-                    onClick={() => handleSort(header)}
-                    className="cursor-pointer px-3 py-3 text-left font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap"
-                  >
-                    {header}
-                    {sortBy === header && (
-                      <span className="ml-2 text-muted-foreground">{sortOrder === "asc" ? "↑" : "↓"}</span>
-                    )}
-                  </th>
-                ))}
+                {tableHeaders.map((header) => {
+                  const headerAlignment = getHeaderAlignment(header)
+                  return (
+                    <th
+                      key={header}
+                      onClick={() => handleSort(header)}
+                      className={`cursor-pointer px-3 py-3 font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap ${headerAlignment}`}
+                    >
+                      {header}
+                      {sortBy === header && (
+                        <span className="ml-2 text-muted-foreground">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
