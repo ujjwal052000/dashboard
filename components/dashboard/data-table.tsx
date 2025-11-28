@@ -157,58 +157,62 @@ export function DataTable({ filteredData }: DataTableProps) {
           No funnel-specific columns detected. Make sure your sheets include Date, Sent, and Leads information.
         </p>
       ) : (
-        <div className="overflow-x-auto overflow-y-auto rounded-2xl border border-border/40 shadow-inner max-h-[360px]">
-          <table className="w-full min-w-[580px] table-fixed text-xs sm:text-sm">
-            <thead>
-              <tr className="bg-muted/40 text-[11px] sm:text-xs">
-                {tableHeaders.map((header) => {
-                  const headerAlignment = getHeaderAlignment(header)
-                  return (
-                    <th
-                      key={header}
-                      onClick={() => handleSort(header)}
-                      className={`cursor-pointer px-3 py-3 font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap ${headerAlignment}`}
-                    >
-                      {header}
-                      {sortBy === header && (
-                        <span className="ml-2 text-muted-foreground">{sortOrder === "asc" ? "↑" : "↓"}</span>
-                      )}
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedData.length === 0 ? (
-                <tr>
-                  <td colSpan={tableHeaders.length} className="px-4 py-8 text-center text-muted-foreground">
-                    No data available
-                  </td>
-                </tr>
-              ) : (
-                sortedData.map((row, idx) => (
-                  <tr
-                    key={row._id || idx}
-                    className="border-b border-border/20 bg-white/80 dark:bg-gray-900/40 even:bg-muted/30 hover:bg-primary/5 transition-colors text-[12px] sm:text-xs"
-                  >
-                    {tableHeaders.map((header, colIdx) => {
-                      const value = row[header] || ''
-                      const isNumeric = !isNaN(Number(value)) && value !== ''
-                      const alignment = getCellAlignment(header, isNumeric)
+        <div className="w-full overflow-x-auto -mx-2 sm:mx-0">
+          <div className="inline-block min-w-full align-middle px-2 sm:px-0">
+            <div className="overflow-x-auto overflow-y-auto rounded-2xl border border-border/40 shadow-inner max-h-[360px]">
+              <table className="w-full min-w-[600px] text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-muted/40 text-[11px] sm:text-xs">
+                    {tableHeaders.map((header) => {
+                      const headerAlignment = getHeaderAlignment(header)
                       return (
-                        <td
-                          key={`${header}-${colIdx}`}
-                          className={`px-3 py-2 text-foreground whitespace-nowrap ${alignment}`}
+                        <th
+                          key={header}
+                          onClick={() => handleSort(header)}
+                          className={`cursor-pointer px-3 py-3 font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap ${headerAlignment}`}
                         >
-                          {isNumeric ? Number(value).toLocaleString() : String(value)}
-                        </td>
+                          {header}
+                          {sortBy === header && (
+                            <span className="ml-2 text-muted-foreground">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                          )}
+                        </th>
                       )
                     })}
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {sortedData.length === 0 ? (
+                    <tr>
+                      <td colSpan={tableHeaders.length} className="px-4 py-8 text-center text-muted-foreground">
+                        No data available
+                      </td>
+                    </tr>
+                  ) : (
+                    sortedData.map((row, idx) => (
+                      <tr
+                        key={row._id || idx}
+                        className="border-b border-border/20 bg-white/80 dark:bg-gray-900/40 even:bg-muted/30 hover:bg-primary/5 transition-colors text-[12px] sm:text-xs"
+                      >
+                        {tableHeaders.map((header, colIdx) => {
+                          const value = row[header] || ''
+                          const isNumeric = !isNaN(Number(value)) && value !== ''
+                          const alignment = getCellAlignment(header, isNumeric)
+                          return (
+                            <td
+                              key={`${header}-${colIdx}`}
+                              className={`px-3 py-2 text-foreground whitespace-nowrap ${alignment}`}
+                            >
+                              {isNumeric ? Number(value).toLocaleString() : String(value)}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
       <p className="mt-4 text-[11px] text-muted-foreground">
