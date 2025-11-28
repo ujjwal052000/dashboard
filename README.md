@@ -85,12 +85,39 @@ The dashboard automatically detects:
 
 All columns from your sheets are displayed in the data table, regardless of structure.
 
+## Deployment
+
+For production deployment, you need to set the `GOOGLE_SERVICE_ACCOUNT` environment variable in your hosting platform.
+
+**⚠️ Important:** GitHub Pages does NOT support Next.js API routes. Use one of these platforms instead:
+- **Vercel** (Recommended) - Best for Next.js apps
+- **Netlify** - Good alternative
+- **Railway** or **Render** - Other options
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
+
+### Quick Deploy to Vercel:
+
+1. Go to [vercel.com](https://vercel.com) and sign up with GitHub
+2. Import your repository: `ujjwal052000/dashboard`
+3. Add environment variable:
+   - Go to Project Settings → Environment Variables
+   - Add `GOOGLE_SERVICE_ACCOUNT` with your service account JSON
+4. Deploy! Your app will be live at `https://your-project.vercel.app`
+
 ## Troubleshooting
 
 ### "GOOGLE_SERVICE_ACCOUNT environment variable is not set"
+**For Local Development:**
 - Make sure you've created a `.env.local` file in the root directory
 - Verify the JSON is properly formatted (single-line, all quotes escaped)
 - Restart the development server after adding the environment variable
+
+**For Production/Deployment:**
+- Set the environment variable in your hosting platform (Vercel, Netlify, etc.)
+- Make sure the variable is set for the correct environment (Production/Preview)
+- Redeploy after adding the environment variable
+- See [DEPLOYMENT.md](./DEPLOYMENT.md) for platform-specific instructions
 
 ### "Failed to fetch sheet data"
 - Verify your Google Sheets are shared with `dashboard-sheet@dashboard-479519.iam.gserviceaccount.com`
