@@ -74,6 +74,22 @@ GOOGLE_SERVICE_ACCOUNT={"type":"service_account","project_id":"dashboard-479519"
    - Environment → Add `GOOGLE_SERVICE_ACCOUNT`
 6. **Deploy**
 
+## Domain Configuration
+
+If you're getting "Invalid Configuration" error when adding a custom domain:
+
+1. **Check DNS Records:**
+   - Vercel will show you the exact DNS records needed
+   - Add them in your domain registrar's DNS settings
+   - Wait 10-30 minutes for DNS propagation
+
+2. **Common Issues:**
+   - Wrong DNS record type (A vs CNAME)
+   - DNS records not propagated yet
+   - Conflicting DNS records
+
+See [VERCEL_DOMAIN_SETUP.md](./VERCEL_DOMAIN_SETUP.md) for detailed troubleshooting steps.
+
 ## Important Notes
 
 ⚠️ **Security:**
