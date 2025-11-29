@@ -18,21 +18,27 @@ const PREFERRED_COLUMN_GROUPS: string[][] = [
 const NUMERIC_HEADER_REGEX = /(sent|open|click|unsubscribe|leads)/i
 
 const getCellAlignment = (header: string, isNumeric: boolean) => {
-  if (/date/i.test(header) || /alia/i.test(header) || /edm|campaign|channel|type|activity/i.test(header)) {
+  // Left align for text columns
+  if (/date/i.test(header) || /alia/i.test(header) || /edm|campaign|channel|type|activity|name/i.test(header)) {
     return 'text-left'
   }
-  if (isNumeric) return 'text-right'
-  return 'text-center'
+  // Right align for all numeric columns
+  if (isNumeric || NUMERIC_HEADER_REGEX.test(header)) {
+    return 'text-right font-mono tabular-nums'
+  }
+  return 'text-left'
 }
 
 const getHeaderAlignment = (header: string) => {
-  if (/date/i.test(header) || /alia/i.test(header) || /edm|campaign|channel|type|activity/i.test(header)) {
+  // Left align for text columns
+  if (/date/i.test(header) || /alia/i.test(header) || /edm|campaign|channel|type|activity|name/i.test(header)) {
     return 'text-left'
   }
+  // Right align for numeric columns
   if (NUMERIC_HEADER_REGEX.test(header)) {
     return 'text-right'
   }
-  return 'text-center'
+  return 'text-left'
 }
 
 interface DataTableProps {
@@ -166,16 +172,17 @@ export function DataTable({ filteredData }: DataTableProps) {
                     {tableHeaders.map((header) => {
                       const headerAlignment = getHeaderAlignment(header)
                       return (
-                        <th
-                          key={header}
-                          onClick={() => handleSort(header)}
-                          className={`cursor-pointer px-3 py-3 font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap ${headerAlignment}`}
-                        >
-                          {header}
-                          {sortBy === header && (
-                            <span className="ml-2 text-muted-foreground">{sortOrder === "asc" ? "↑" : "↓"}</span>
-                          )}
-                        </th>
+                    <th
+                      key={header}
+                      onClick={() => handleSort(header)}
+                      className={`cursor-pointer px-3 py-3 font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap ${headerAlignment}`}
+                      style={NUMERIC_HEADER_REGEX.test(header) ? { textAlign: 'right' } : undefined}
+                    >
+                      {header}
+                      {sortBy === header && (
+                        <span className="ml-2 text-muted-foreground">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </th>
                       )
                     })}
                   </tr>
@@ -195,12 +202,13 @@ export function DataTable({ filteredData }: DataTableProps) {
                       >
                         {tableHeaders.map((header, colIdx) => {
                           const value = row[header] || ''
-                          const isNumeric = !isNaN(Number(value)) && value !== ''
+                          const isNumeric = !isNaN(Number(value)) && value !== '' && value !== null
                           const alignment = getCellAlignment(header, isNumeric)
                           return (
                             <td
                               key={`${header}-${colIdx}`}
                               className={`px-3 py-2 text-foreground whitespace-nowrap ${alignment}`}
+                              style={isNumeric ? { textAlign: 'right' } : undefined}
                             >
                               {isNumeric ? Number(value).toLocaleString() : String(value)}
                             </td>

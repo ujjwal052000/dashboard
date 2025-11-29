@@ -112,10 +112,31 @@ export function KPICards({ data }: KPICardsProps) {
         // Extract color name from gradient string (e.g., "from-blue-500 to-blue-600" -> "blue")
         const colorName = kpi.color.split(' ')[0]?.replace('from-', '').split('-')[0] || 'blue'
         
+        // Map color names to border colors
+        const borderColorMap: Record<string, string> = {
+          blue: 'border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-500',
+          green: 'border-green-200 dark:border-green-800 hover:border-green-400 dark:hover:border-green-500',
+          purple: 'border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-500',
+          orange: 'border-orange-200 dark:border-orange-800 hover:border-orange-400 dark:hover:border-orange-500',
+          teal: 'border-teal-200 dark:border-teal-800 hover:border-teal-400 dark:hover:border-teal-500',
+          indigo: 'border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-500',
+        }
+        const borderColor = borderColorMap[colorName] || 'border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
+        
         return (
           <Card
             key={index}
-            className="border-0 bg-white dark:bg-gray-900 p-6 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden relative group"
+            className={`border ${borderColor} bg-white dark:bg-gray-900 p-6 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden relative group`}
+            style={{
+              borderWidth: '1px',
+              transition: 'border-width 0.3s ease, box-shadow 0.3s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderWidth = '3px'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderWidth = '1px'
+            }}
           >
             <div 
               className="absolute inset-0 opacity-0 group-hover:opacity-5 transition-opacity duration-300"
